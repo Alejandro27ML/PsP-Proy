@@ -50,3 +50,22 @@ CREATE INDEX idx_accounts_user_id ON accounts(user_id);
 CREATE INDEX idx_transactions_from_account ON transactions(from_account_id);
 CREATE INDEX idx_transactions_to_account ON transactions(to_account_id);
 CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+
+-- Crear tabla de transferencias
+CREATE TABLE transfers (
+    id SERIAL PRIMARY KEY,
+    target_iban VARCHAR(34) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    concept VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- HARDENING: Crear usuario con privilegios mínimos
+CREATE USER securepay_app WITH PASSWORD 'AppPassword456';
+
+-- Dar permiso de conexión
+GRANT CONNECT ON DATABASE securepay TO securepay_app;
+
+-- Solo permitir INSERT y SELECT, denegar UPDATE y DROP
+GRANT SELECT, INSERT ON TABLE transfers TO securepay_app;
+GRANT USAGE, SELECT ON SEQUENCE transfers_id_seq TO securepay_app;

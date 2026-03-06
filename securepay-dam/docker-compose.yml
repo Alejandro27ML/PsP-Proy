@@ -24,7 +24,7 @@ services:
       - db
     networks:
       - secure-net
-      
+
   transfer-service:
     build: ./transfer-service
     ports:
@@ -47,6 +47,18 @@ services:
     environment:
       - JWT_SECRET=your_jwt_secret_key
       
+    depends_on:
+      - auth-service
+      - transfer-service
+    networks:
+      - secure-net
+
+api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - JWT_SECRET=your_jwt_secret_key
     depends_on:
       - auth-service
       - transfer-service

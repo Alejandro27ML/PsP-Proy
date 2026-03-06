@@ -18,6 +18,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - secure-net
 
   auth-service:
     build: ./auth-service
@@ -32,11 +34,12 @@ services:
       DB_PASSWORD: secure_password
       DB_NAME: securepay_db
     depends_on:
-      postgres:
-        condition: service_healthy
+      -db
     volumes:
       - ./auth-service:/app
       - /app/node_modules
+    networks:
+      - secure-net
 
   transfer-service:
     build: ./transfer-service
@@ -52,11 +55,18 @@ services:
       DB_NAME: securepay_db
       AUTH_SERVICE_URL: http://auth-service:3001
     depends_on:
-      postgres:
-        condition: service_healthy
+      -db
     volumes:
       - ./transfer-service:/app
       - /app/node_modules
+    networks:
+      - secure-net
 
 volumes:
   postgres_data:
+
+
+networks:
+  secure-net:
+    driver: bridge # Red aislada: Los servicios no se ven desde el exterior, solo vía Gateway
+

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: securepay-db
+    environment:
+      POSTGRES_USER: secure_user
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: securepay_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U secure_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: ./auth-service
+    container_name: securepay-auth
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: secure_user
+      DB_PASSWORD: secure_password
+      DB_NAME: securepay_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./auth-service:/app
+      - /app/node_modules
+
+  transfer-service:
+    build: ./transfer-service
+    container_name: securepay-transfer
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: secure_user
+      DB_PASSWORD: secure_password
+      DB_NAME: securepay_db
+      AUTH_SERVICE_URL: http://auth-service:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./transfer-service:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:

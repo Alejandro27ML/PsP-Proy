@@ -1,0 +1,115 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: securepay-db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - securepay-network
+    restart: unless-stopped
+
+  # API Gateway - Punto de entrada único
+  api-gateway:
+    build: ./api-gateway
+    container_name: securepay-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: ${PORT_GATEWAY}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      TRANSFER_SERVICE_URL: ${TRANSFER_SERVICE_URL}
+      AUDIT_SERVICE_URL: ${AUDIT_SERVICE_URL}
+      RATE_LIMIT: ${RATE_LIMIT}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW}
+    depends_on:
+      - auth-service
+      - transfer-service
+      - audit-logs
+    networks:
+      - securepay-network
+    restart: unless-stopped
+
+  # Auth Service - Gestión de usuarios y JWT
+  auth-service:
+    build: ./auth-service
+    container_name: securepay-auth
+    environment:
+      PORT: ${PORT_AUTH}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - securepay-network
+    restart: unless-stopped
+
+  # Transfer Service - Núcleo crítico con validaciones CIA
+  transfer-service:
+    build: ./transfer-service
+    container_name: securepay-transfer
+    environment:
+      PORT: ${PORT_TRANSFER}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      AUDIT_SERVICE_URL: ${AUDIT_SERVICE_URL}
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - securepay-network
+    restart: unless-stopped
+
+  # Audit Logs Service - Persistencia de eventos
+  audit-logs:
+    build: ./audit-logs
+    container_name: securepay-audit
+    environment:
+      PORT: ${PORT_AUDIT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      LOG_LEVEL: ${LOG_LEVEL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - securepay-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  securepay-network:
+    driver: bridge
